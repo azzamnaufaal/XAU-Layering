@@ -18,7 +18,6 @@
   <div class="flex items-center justify-between fade-in">
     <div class="font-semibold text-xl">Hasil Simulasi</div>
     <div class="flex items-center gap-3">
-        <div id="status-badge"></div>
       <div id="recap" class="hidden md:block text-xs text-gray-600"></div>
       <a href="form.html" class="px-4 py-2 rounded-xl border shadow-sm hover:bg-gray-50">Edit Inputs</a>
     </div>
@@ -106,7 +105,7 @@
         <thead class="bg-gray-100 sticky top-0">
           <tr>
             <th class="text-left p-2">Layer</th>
-            <th class="text-left p-2">Bucket</th>
+            <th class="text-left p-2">Modal</th>
             <th class="text-left p-2">Harga</th>
             <th class="text-left p-2">Floating Loss</th>
             <th class="text-left p-2">Equity</th>
@@ -147,34 +146,42 @@ $("btn-reset-spacing").addEventListener("click", ()=>{
 });
 $("btn-apply-spacing").addEventListener("click", renderAll);
 
-function simulate(){
-  const valPerDollar = inputs.lot * CONTRACT_SIZE;
+function simulate(maxIter = 50000, priceFloor = 0) {
+  const valPerDollar = inputs.lot * 100; // CONTRACT_SIZE = 100
   const s1 = +$("spacing-1").value || 2;
   const s2 = +$("spacing-2").value || 5;
   const s3 = +$("spacing-3").value || 10;
+
   const bs = [
-    { name:"Tahap 1", trigger: inputs.modal/3, spacing: s1 },
+    { name:"Tahap 1", trigger: inputs.modal/3,     spacing: s1 },
     { name:"Tahap 2", trigger: (2*inputs.modal)/3, spacing: s2 },
-    { name:"Tahap 3", trigger: Infinity, spacing: s3 },
+    { name:"Tahap 3", trigger: Infinity,           spacing: s3 },
   ];
 
-  let rows=[], offset=0, floating=0, stop=null;
-  for(let i=1;i<=200;i++){
-    const b = bs.find(x=>floating < x.trigger) || bs.at(-1);
+  let rows = [], offset = 0, floating = 0, stop = null;
+  let i = 0;
+
+  // loop sampai STOP / harga mentok / guard maxIter
+  while (i < maxIter) {
+    i++;
+
+    const b = bs.find(x => floating < x.trigger) || bs.at(-1);
     offset += b.spacing;
+
     const harga = inputs.price - offset;
-    const fl    = (inputs.price - harga) * valPerDollar;
-    floating += fl;
+    if (harga <= priceFloor) break; // guard kalau perlu
+
+    const flAdd  = (inputs.price - harga) * valPerDollar; // akumulasi segitiga
+    floating    += flAdd;
+
     const equity = inputs.modal - floating;
+    let status   = "Aman";
+    if (equity <= 0) status = "STOP";
+    else if (b.name === "Tahap 2") status = "Waspada";
+    else if (b.name === "Tahap 3") status = "Darurat";
 
-    let stageStatus = "";
-    if(equity <= 0) stageStatus = "STOP";
-    else if(b.name==="Tahap 1") stageStatus = "Aman";
-    else if(b.name==="Tahap 2") stageStatus = "Waspada";
-    else if(b.name==="Tahap 3") stageStatus = "Darurat";
-
-    rows.push({ layer:i, bucket:b.name, harga, floating, equity, status:stageStatus });
-    if(stageStatus==="STOP"){ stop = rows.at(-1); break; }
+    rows.push({ layer:i, bucket:b.name, harga, floating, equity, status });
+    if (status === "STOP") { stop = rows[rows.length - 1]; break; }
   }
   return { rows, stop };
 }
@@ -203,13 +210,6 @@ function renderAll(){
   const maxDD    = ((inputs.modal - minEq) / inputs.modal) * 100;
   const dropAbs  = inputs.price - endPrice;
   const dropPct  = (dropAbs / inputs.price) * 100;
-  const badge = stop
-  ? '<span class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-semibold">STOP</span> <span class="text-red-700 text-xs">Modal habis, simulasi berhenti</span>'
-  : '<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">BERJALAN</span> <span class="text-emerald-700 text-xs">Simulasi masih dalam batas aman</span>';
-
-$("status-badge").innerHTML = badge;
-
-
 
   $("summary-detail").innerHTML = `
     <div class="grid md:grid-cols-3 gap-3">
