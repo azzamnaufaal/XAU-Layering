@@ -8,8 +8,8 @@
 🚀 **XAU Layering Simulator** adalah web interaktif untuk mensimulasikan strategi layering *buy-only* pada **XAUUSD (Gold)**.  
 Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal per bucket**, dan **potensi stop-out** saat harga turun ekstrem.
 
-![screenshot](./assets/Screenshot.png)  
-<sub>*Contoh tampilan simulator (Summary, Tabel, dan Grafik Equity)*</sub>
+<img src="./assets/Screenshot.png" width="600"> 
+<sub>Contoh tampilan simulator</sub>
 
 ---
 
