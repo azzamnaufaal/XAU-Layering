@@ -14,9 +14,11 @@
 <body class="bg-gray-50 text-gray-900 p-6 max-w-6xl mx-auto space-y-6">
 
   <!-- Header -->
+   
   <div class="flex items-center justify-between fade-in">
     <div class="font-semibold text-xl">Hasil Simulasi</div>
     <div class="flex items-center gap-3">
+        <div id="status-badge"></div>
       <div id="recap" class="hidden md:block text-xs text-gray-600"></div>
       <a href="form.html" class="px-4 py-2 rounded-xl border shadow-sm hover:bg-gray-50">Edit Inputs</a>
     </div>
@@ -201,20 +203,22 @@ function renderAll(){
   const maxDD    = ((inputs.modal - minEq) / inputs.modal) * 100;
   const dropAbs  = inputs.price - endPrice;
   const dropPct  = (dropAbs / inputs.price) * 100;
+  const badge = stop
+  ? '<span class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-semibold">STOP</span> <span class="text-red-700 text-xs">Modal habis, simulasi berhenti</span>'
+  : '<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">BERJALAN</span> <span class="text-emerald-700 text-xs">Simulasi masih dalam batas aman</span>';
+
+$("status-badge").innerHTML = badge;
+
+
 
   $("summary-detail").innerHTML = `
-    <div class="flex items-center gap-3 mb-3">
-      ${stop ? '<span class="px-2 py-1 rounded bg-red-50 text-red-700 text-xs font-semibold">STOP</span>'
-             : '<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-xs font-semibold">BERJALAN</span>'}
-      <span class="text-xs text-gray-500">Max Drawdown: <b>${pct(maxDD)}</b></span>
-    </div>
     <div class="grid md:grid-cols-3 gap-3">
       <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Total Layer</div><div class="text-lg font-semibold">${stop ? stop.layer : last.layer}</div></div>
       <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Harga Stop</div><div class="text-lg font-semibold">${fmt2(endPrice)}</div></div>
       <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Total Lot</div><div class="text-lg font-semibold">${fmt2((stop ? stop.layer : last.layer) * inputs.lot)}</div></div>
       <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Floating Loss</div><div class="text-lg font-semibold">${fmt(stop ? stop.floating : last.floating)}</div></div>
       <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Equity</div><div class="text-lg font-semibold">${fmt(stop ? minEq : last.equity)}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Penurunan dari Harga Entry</div><div class="text-lg font-semibold">-${fmt2(dropAbs)} (${pct(dropPct)})</div></div>
+      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Penurunan dari Harga Entry</div><div class="text-lg font-semibold">- ${pct(dropPct)}</div></div>
     </div>`;
 
   // tabel
