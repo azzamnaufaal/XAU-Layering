@@ -4,50 +4,64 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>XAU Layering Simulator</title>
-  <!-- Tailwind & Chart.js (CDN) -->
-  <script src="https://cdn.tailwindcss.com" defer></script>
+
+  <!-- 1) Tailwind: load TANPA defer (lebih stabil di sebagian browser/jaringan) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- 2) Fallback CSS minimal kalau Tailwind gagal dimuat -->
+  <style>
+    /* pastikan section result tak muncul sebelum Run meski Tailwind gagal */
+    #view-result { display: none; }
+    /* class hidden tetap bekerja walau Tailwind gagal */
+    .hidden { display: none !important; }
+    /* sedikit typografi default */
+    body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+  </style>
+
+  <!-- Chart.js boleh tetap defer -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
+  <!-- APP SCRIPT (defer tetap ok) -->
   <script defer>
-  // ---------- Helpers ----------
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, html) => { const n=document.createElement(tag); if(cls) n.className=cls; if(html!==undefined) n.innerHTML=html; return n; };
 
-  // ---------- Global state ----------
-  let inputs   = { modal: 0, lot: 0, price: 0 }; // user inputs
-  let buckets  = [];   // auto 2 buckets (⅓ & ⅔ modal)
+  let inputs = { modal: 0, lot: 0, price: 0 };
+  let buckets = [];
   let chartRef = null;
+  const CONTRACT_SIZE = 100;
 
-  const CONTRACT_SIZE = 100; // XAU fixed
-
-  // ---------- UI switching ----------
   function show(section){
-    $("view-form").classList.toggle("hidden", section !== "form");
-    $("view-result").classList.toggle("hidden", section !== "result");
-    // simple fade
-    const tgt = section === "form" ? $("view-form") : $("view-result");
-    tgt.classList.remove("opacity-0"); tgt.classList.add("opacity-100");
+    const form = $("view-form");
+    const result = $("view-result");
+    if(section === "form"){
+      form.style.display = "";   // biar tetap tampil walau Tailwind tak ada
+      result.style.display = "none";
+      form.classList.remove("hidden");
+      result.classList.add("hidden");
+    }else{
+      form.style.display = "none";
+      result.style.display = "";
+      form.classList.add("hidden");
+      result.classList.remove("hidden");
+    }
   }
 
-  // ---------- Buckets ----------
   function genBuckets(modal){
     buckets = [
-      { name: "B1", trigger: modal/3,     spacing: 2 },
-      { name: "B2", trigger: 2*modal/3,   spacing: 5 }
+      { name: "B1", trigger: modal/3,   spacing: 2 },
+      { name: "B2", trigger: 2*modal/3, spacing: 5 }
     ];
   }
 
   function renderBucketsEditor(){
     const wrap = $("buckets"); wrap.innerHTML = "";
-
-    // header
     wrap.appendChild(el("div","grid grid-cols-12 gap-3 text-xs text-gray-500",
       `<div class="col-span-3">Nama</div>
        <div class="col-span-6">Trigger Floating Loss (USC)</div>
        <div class="col-span-3">Spacing ($/layer)</div>`));
 
-    // rows
-    buckets.forEach((b, i) => {
+    buckets.forEach((b,i)=>{
       const row = el("div","grid grid-cols-12 gap-3 items-center");
       const name = el("input","col-span-3 border rounded-xl p-2 text-sm"); name.value=b.name; name.oninput=e=>{b.name=e.target.value};
       const trig = el("input","col-span-6 border rounded-xl p-2 text-sm"); trig.type="number"; trig.value=b.trigger; trig.oninput=e=>{b.trigger=+e.target.value||0};
@@ -56,80 +70,67 @@
       wrap.appendChild(row);
     });
 
-    // helper text
     wrap.appendChild(el("div","text-xs text-gray-500 mt-2",
-      `Buckets dibuat otomatis dari modal: <b>⅓</b> dan <b>⅔</b> modal. Kamu bisa ubah spacing & trigger bila perlu.`));
+      `Buckets otomatis dari modal: <b>⅓</b> & <b>⅔</b>. Ubah spacing/trigger jika perlu.`));
   }
 
-  // ---------- Validation ----------
   function validateInputs(){
     const modal = +($("f-modal").value||0);
     const lot   = +($("f-lot").value||0);
     const price = +($("f-price").value||0);
-    const errs = [];
-    if(!modal || modal<=0) errs.push("Modal harus diisi (> 0).");
-    if(!lot   || lot<=0)   errs.push("Lot per layer harus diisi (> 0).");
-    if(!price || price<=0) errs.push("Harga awal harus diisi (> 0).");
+    const errs=[];
+    if(!modal||modal<=0) errs.push("Modal harus diisi (>0).");
+    if(!lot||lot<=0)     errs.push("Lot per layer harus diisi (>0).");
+    if(!price||price<=0) errs.push("Harga awal harus diisi (>0).");
     return { ok: errs.length===0, modal, lot, price, errs };
   }
 
-  // ---------- Form actions ----------
   function onRun(){
-    const v = validateInputs();
-    const errBox = $("form-error");
-    if(!v.ok){
-      errBox.innerHTML = v.errs.map(e=>`<div>• ${e}</div>`).join("");
-      errBox.classList.remove("hidden");
-      return;
-    }
+    const v=validateInputs(), errBox=$("form-error");
+    if(!v.ok){ errBox.innerHTML=v.errs.map(e=>`<div>• ${e}</div>`).join(""); errBox.classList.remove("hidden"); return; }
     errBox.classList.add("hidden");
-
-    inputs = { modal: v.modal, lot: v.lot, price: v.price };
+    inputs={ modal:v.modal, lot:v.lot, price:v.price };
     genBuckets(inputs.modal);
     renderBucketsEditor();
     renderAll();
     show("result");
   }
   function onEdit(){
-    $("f-modal").value = inputs.modal || "";
-    $("f-lot").value   = inputs.lot   || "";
-    $("f-price").value = inputs.price || "";
+    $("f-modal").value=inputs.modal||"";
+    $("f-lot").value=inputs.lot||"";
+    $("f-price").value=inputs.price||"";
     show("form");
   }
 
-  // ---------- Simulation ----------
   function simulate(){
-    const { modal, lot, price } = inputs;
-    const valPerDollar = lot * CONTRACT_SIZE;
-    const bs = [...buckets].sort((a,b)=>a.trigger-b.trigger);
-
+    const {modal, lot, price}=inputs;
+    const valPerDollar=lot*CONTRACT_SIZE;
+    const bs=[...buckets].sort((a,b)=>a.trigger-b.trigger);
     let rows=[], offset=0, floating=0, stop=null;
     for(let i=1;i<=200;i++){
-      const b = bs.find(x=>floating < x.trigger) || bs.at(-1);
-      offset += (b?.spacing||0);
-      const harga = price - offset;
-      const flPos = (price - harga) * valPerDollar; // buy-only
-      floating += flPos;
-      const equity = modal - floating;
-      const status = equity <= 0 ? "STOP" : "";
-      rows.push({ layer:i, bucket:b?.name||"-", harga, floating, equity, status });
-      if(status==="STOP"){ stop = rows.at(-1); break; }
+      const b=bs.find(x=>floating<x.trigger)||bs.at(-1);
+      offset+=(b?.spacing||0);
+      const harga=price-offset;
+      const flPos=(price-harga)*valPerDollar;
+      floating+=flPos;
+      const equity=modal-floating;
+      const status=equity<=0?"STOP":"";
+      rows.push({layer:i,bucket:b?.name||"-",harga,floating,equity,status});
+      if(status==="STOP"){ stop=rows.at(-1); break; }
     }
-    return { rows, stop };
+    return {rows,stop};
   }
 
-  // ---------- Renderers ----------
   function renderSummary(rows, stop){
-    const box = $("summary");
-    if(!rows.length){ box.innerHTML = "–"; return; }
-
-    const last = rows.at(-1);
-    const minEq = rows.reduce((m,r)=>Math.min(m, r.equity), Infinity);
-    const maxDD = ((inputs.modal - minEq) / inputs.modal) * 100;
-    const hargaMin = rows.reduce((m,r)=>Math.min(m, r.harga), inputs.price);
+    const box=$("summary");
+    if(!rows.length){ box.innerHTML="–"; return; }
+    const last=rows.at(-1);
+    const minEq=rows.reduce((m,r)=>Math.min(m,r.equity),Infinity);
+    const maxDD=((inputs.modal-minEq)/inputs.modal)*100;
+    const hargaMin=rows.reduce((m,r)=>Math.min(m,r.harga),inputs.price);
 
     if(stop){
-      box.innerHTML = `
+      box.innerHTML=`
         <div class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
           <div><b>Layer STOP</b>: ${stop.layer}</div>
           <div><b>Bucket STOP</b>: ${stop.bucket}</div>
@@ -141,7 +142,7 @@
           <div><b>Harga Terendah</b>: ${hargaMin.toFixed(2)}</div>
         </div>`;
     } else {
-      box.innerHTML = `
+      box.innerHTML=`
         <div class="grid sm:grid-cols-2 gap-x-8 gap-y-2 text-sm">
           <div><b>Layer Terakhir</b>: ${last.layer}</div>
           <div><b>Bucket Terakhir</b>: ${last.bucket}</div>
@@ -156,127 +157,108 @@
   }
 
   function renderTable(rows){
-    const tb = $("tbody");
-    tb.innerHTML = "";
+    const tb=$("tbody"); tb.innerHTML="";
     rows.forEach(r=>{
-      const tr = el("tr", r.status==="STOP" ? "bg-red-50" : "");
+      const tr=el("tr", r.status==="STOP"?"bg-red-50":"");
       tr.append(
-        el("td","p-2", r.layer),
-        el("td","p-2", r.bucket),
-        el("td","p-2", r.harga.toFixed(2)),
-        el("td","p-2", r.floating.toLocaleString()),
-        el("td","p-2", r.equity.toLocaleString()),
-        el("td","p-2", r.status||"")
+        el("td","p-2",r.layer),
+        el("td","p-2",r.bucket),
+        el("td","p-2",r.harga.toFixed(2)),
+        el("td","p-2",r.floating.toLocaleString()),
+        el("td","p-2",r.equity.toLocaleString()),
+        el("td","p-2",r.status||"")
       );
       tb.appendChild(tr);
     });
   }
 
   function renderChart(rows){
-    const ctx = $("chart")?.getContext("2d"); if(!ctx) return;
+    const ctx=$("chart")?.getContext("2d"); if(!ctx) return;
     if(chartRef) chartRef.destroy();
-    chartRef = new Chart(ctx,{
-      type: "line",
-      data: {
-        labels: rows.map(r=>r.harga.toFixed(2)),
-        datasets: [{ label: "Equity (USC)", data: rows.map(r=>r.equity), borderColor: "#2563eb", borderWidth: 2, fill: false, tension: .2 }]
-      },
-      options: { responsive:true, scales:{ x:{ title:{display:true,text:"Harga Entry"} }, y:{ title:{display:true,text:"Equity (USC)"} } } }
+    chartRef=new Chart(ctx,{
+      type:"line",
+      data:{labels:rows.map(r=>r.harga.toFixed(2)),datasets:[{label:"Equity (USC)",data:rows.map(r=>r.equity),borderColor:"#2563eb",borderWidth:2,fill:false,tension:.2}]},
+      options:{responsive:true,scales:{x:{title:{display:true,text:"Harga Entry"}},y:{title:{display:true,text:"Equity (USC)"}}}}
     });
   }
 
   function renderAll(){
-    const { rows, stop } = simulate();
-    // recap strip
-    $("recap").innerHTML = `
-      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">
-        Modal: <b>${inputs.modal.toLocaleString()} USC</b> • Lot/layer: <b>${inputs.lot}</b> • Harga awal: <b>${inputs.price}</b>
-      </span>`;
-    renderSummary(rows, stop);
+    const {rows,stop}=simulate();
+    $("recap").innerHTML = `Modal: <b>${inputs.modal.toLocaleString()} USC</b> • Lot/layer: <b>${inputs.lot}</b> • Harga awal: <b>${inputs.price}</b>`;
+    renderSummary(rows,stop);
     renderTable(rows);
     renderChart(rows);
   }
 
-  // ---------- Init ----------
-  document.addEventListener("DOMContentLoaded", ()=>{
+  document.addEventListener("DOMContentLoaded",()=>{
     $("btn-run").addEventListener("click", onRun);
     $("btn-edit").addEventListener("click", onEdit);
   });
   </script>
-
-  <style>
-    /* smooth appear */
-    #view-form, #view-result { transition: opacity .25s ease; }
-    .fade-in { animation: fade .35s ease both; }
-    @keyframes fade { from {opacity:0; transform: translateY(6px)} to {opacity:1; transform:none} }
-  </style>
 </head>
 <body class="bg-gray-50 text-gray-900">
+  <noscript>
+    <div style="padding:12px;background:#fee2e2;color:#7f1d1d;">
+      Aplikasi ini membutuhkan JavaScript. Aktifkan JavaScript di browser Anda.
+    </div>
+  </noscript>
 
-  <!-- ========== VIEW: FORM (landing clean) ========== -->
-  <section id="view-form" class="min-h-screen flex items-center justify-center p-6 opacity-100">
-    <div class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-8 fade-in">
+  <!-- VIEW: FORM -->
+  <section id="view-form" class="min-h-screen flex items-center justify-center p-6">
+    <div class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-8">
       <div class="text-center space-y-2 mb-6">
-        <h1 class="text-3xl font-bold tracking-tight">XAU Layering Simulator</h1>
+        <h1 class="text-3xl font-bold">XAU Layering Simulator</h1>
         <p class="text-gray-500 text-sm">Masukkan parameter. Buckets otomatis dari <b>⅓</b> & <b>⅔</b> modal.</p>
       </div>
 
       <div class="space-y-4">
         <label class="block">
           <span class="text-sm font-medium">Modal (USC)</span>
-          <input id="f-modal" type="number" inputmode="numeric" placeholder="contoh: 70000"
-                 class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input id="f-modal" type="number" inputmode="numeric" placeholder="contoh: 70000" class="mt-1 w-full border rounded-xl p-3 text-lg">
         </label>
         <label class="block">
           <span class="text-sm font-medium">Lot per Layer</span>
-          <input id="f-lot" type="number" step="0.01" placeholder="contoh: 0.03"
-                 class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input id="f-lot" type="number" step="0.01" placeholder="contoh: 0.03" class="mt-1 w-full border rounded-xl p-3 text-lg">
         </label>
         <label class="block">
           <span class="text-sm font-medium">Harga Awal</span>
-          <input id="f-price" type="number" placeholder="contoh: 3700"
-                 class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+          <input id="f-price" type="number" placeholder="contoh: 3700" class="mt-1 w-full border rounded-xl p-3 text-lg">
         </label>
       </div>
 
       <div id="form-error" class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3"></div>
 
       <div class="mt-6 flex justify-center">
-        <button id="btn-run" class="px-8 py-3 text-lg rounded-xl bg-blue-600 text-white shadow hover:bg-blue-700 focus:ring-4 focus:ring-blue-300">
-          Run Simulation
-        </button>
+        <button id="btn-run" class="px-8 py-3 text-lg rounded-xl bg-blue-600 text-white">Run Simulation</button>
       </div>
     </div>
   </section>
 
-  <!-- ========== VIEW: RESULT (clean) ========== -->
-  <section id="view-result" class="hidden p-6 opacity-0 max-w-6xl mx-auto space-y-6">
-    <div class="flex items-center justify-between fade-in">
+  <!-- VIEW: RESULT -->
+  <section id="view-result" class="hidden p-6 max-w-6xl mx-auto space-y-6">
+    <div class="flex items-center justify-between">
       <div class="font-semibold text-xl">Hasil Simulasi</div>
-      <div class="flex items-center gap-3">
+      <div class="flex items-center gap-3 text-sm text-gray-700">
         <div id="recap"></div>
-        <button id="btn-edit" class="px-4 py-2 rounded-xl border shadow-sm hover:bg-gray-50">Edit Inputs</button>
+        <button id="btn-edit" class="px-4 py-2 rounded-xl border">Edit Inputs</button>
       </div>
     </div>
 
-    <!-- Buckets -->
-    <div class="bg-white rounded-2xl shadow p-5 fade-in">
+    <div class="bg-white rounded-2xl shadow p-5">
       <h3 class="font-semibold mb-2">Buckets (otomatis ⅓ & ⅔ modal)</h3>
       <div id="buckets" class="space-y-2"></div>
     </div>
 
-    <!-- Summary -->
-    <div class="bg-white rounded-2xl shadow p-5 fade-in">
+    <div class="bg-white rounded-2xl shadow p-5">
       <h3 class="font-semibold mb-2">Summary</h3>
       <div id="summary" class="text-sm">–</div>
     </div>
 
-    <!-- Tabel -->
-    <div class="bg-white rounded-2xl shadow p-5 fade-in">
+    <div class="bg-white rounded-2xl shadow p-5">
       <h3 class="font-semibold mb-2">Tabel Layer</h3>
       <div class="overflow-auto rounded-xl border">
         <table class="min-w-full text-sm">
-          <thead class="bg-gray-100 sticky top-0">
+          <thead class="bg-gray-100">
             <tr>
               <th class="text-left p-2">Layer</th>
               <th class="text-left p-2">Bucket</th>
@@ -291,12 +273,10 @@
       </div>
     </div>
 
-    <!-- Grafik (paling bawah) -->
-    <div class="bg-white rounded-2xl shadow p-5 fade-in">
+    <div class="bg-white rounded-2xl shadow p-5">
       <h3 class="font-semibold mb-2">Grafik Equity</h3>
       <canvas id="chart" height="160"></canvas>
     </div>
   </section>
-
 </body>
 </html>
