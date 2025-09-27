@@ -3,70 +3,133 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>XAU Layering - Input</title>
+  <title>XAU Layering – Input</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .fade-in { animation: fade .35s ease both; }
+    @keyframes fade { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+  </style>
 </head>
-<body class="bg-gray-50 flex items-center justify-center min-h-screen">
-  <div class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-8">
-    <h1 class="text-3xl font-bold mb-4 text-center">XAU Layering Simulator</h1>
-    <p class="text-gray-500 text-sm text-center mb-6">
-      Masukkan parameter. Trigger bucket otomatis dari <b>⅓</b> & <b>⅔</b> modal.<br/>
-      <b>Spacing awal</b> di sini akan dipakai untuk <b>Bucket 1</b>.<br/>
-      Di hasil: Bucket 2 default <b>$5</b>, Bucket 3 default <b>$10</b> (bisa diubah).
-    </p>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6 text-gray-900">
+  <main class="w-full max-w-xl bg-white shadow-lg rounded-2xl p-8 fade-in">
+    <header class="text-center space-y-2 mb-6">
+      <h1 class="text-3xl font-bold tracking-tight">XAU Layering Simulator</h1>
+      <p class="text-gray-500 text-sm">
+        Masukkan parameter. <b>Spacing awal</b> dipakai untuk <b>Tahap 1</b>.<br/>
+        Tahap 2 default <b>$5</b> &amp; Tahap 3 default <b>$10</b> (bisa diubah di hasil).
+      </p>
+    </header>
 
-    <div class="space-y-4">
+    <section class="space-y-5">
       <label class="block">
         <span class="text-sm font-medium">Modal (USC)</span>
         <input id="modal" type="number" inputmode="numeric" placeholder="contoh: 70000"
-               class="mt-1 w-full border rounded-xl p-3 text-lg">
+               class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <small class="text-xs text-gray-500">Total dana yang dipakai.</small>
       </label>
 
       <label class="block">
         <span class="text-sm font-medium">Lot per Layer</span>
         <input id="lot" type="number" step="0.01" placeholder="contoh: 0.03"
-               class="mt-1 w-full border rounded-xl p-3 text-lg">
+               class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <small class="text-xs text-gray-500">Ukuran posisi tiap layer.</small>
       </label>
 
       <label class="block">
-        <span class="text-sm font-medium">Harga Awal</span>
+        <span class="text-sm font-medium">Harga Entry</span>
         <input id="price" type="number" placeholder="contoh: 3700"
-               class="mt-1 w-full border rounded-xl p-3 text-lg">
+               class="mt-1 w-full border rounded-xl p-3 text-lg focus:ring-2 focus:ring-blue-500 outline-none">
+        <small class="text-xs text-gray-500">Harga entry saat mulai layering.</small>
       </label>
 
       <label class="block">
-        <span class="text-sm font-medium">Spacing awal ($/layer) — dipakai untuk Bucket 1</span>
+        <span class="text-sm font-medium">Spacing awal</span>
         <input id="s1" type="number" step="0.1" placeholder="contoh: 2"
-               class="mt-1 w-full border rounded-xl p-3">
+               class="mt-1 w-full border rounded-xl p-3 focus:ring-2 focus:ring-blue-500 outline-none">
+        <small class="text-xs text-gray-500">Jarak antar layer untuk Tahap 1.</small>
       </label>
-    </div>
+    </section>
 
     <div id="error" class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3"></div>
 
-    <div class="mt-6 flex justify-center">
-      <button id="btn" class="px-8 py-3 text-lg rounded-xl bg-blue-600 text-white shadow hover:bg-blue-700">
+    <div class="mt-6 flex flex-col sm:flex-row items-center gap-3">
+      <button id="run" class="flex-1 px-6 py-3 text-lg rounded-xl bg-blue-600 text-white shadow hover:bg-blue-700">
         Run Simulation
       </button>
+      <button id="reset" class="px-4 py-3 rounded-xl border hover:bg-gray-50">
+        Reset
+      </button>
     </div>
-  </div>
+
+    <footer class="mt-4 text-xs text-gray-400 text-center">
+      Tip: isikan angka lalu tekan <b>Enter</b> untuk cepat menjalankan simulasi.
+    </footer>
+  </main>
 
   <script>
-    document.getElementById("btn").addEventListener("click", () => {
-      const modal = document.getElementById("modal").value;
-      const lot   = document.getElementById("lot").value;
-      const price = document.getElementById("price").value;
-      const s1    = document.getElementById("s1").value || "2"; // default kalau kosong
+    const $ = id => document.getElementById(id);
 
-      const err = document.getElementById("error");
-      if(!modal || !lot || !price){
-        err.classList.remove("hidden");
-        err.textContent = "Isi Modal, Lot/layer, dan Harga awal dulu.";
+    // Load last inputs (localStorage)
+    (function loadDraft(){
+      try{
+        const d = JSON.parse(localStorage.getItem('xau_form_draft')||'{}');
+        if(d.modal) $('modal').value = d.modal;
+        if(d.lot)   $('lot').value   = d.lot;
+        if(d.price) $('price').value = d.price;
+        if(d.s1)    $('s1').value    = d.s1;
+      }catch{}
+    })();
+
+    // Save on change (debounced)
+    ['modal','lot','price','s1'].forEach(id=>{
+      $(id).addEventListener('input', debounce(saveDraft, 250));
+    });
+    function saveDraft(){
+      const draft = {
+        modal: $('modal').value,
+        lot:   $('lot').value,
+        price: $('price').value,
+        s1:    $('s1').value
+      };
+      localStorage.setItem('xau_form_draft', JSON.stringify(draft));
+    }
+    function debounce(fn,ms){
+      let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); };
+    }
+
+    // Submit
+    function submit(){
+      const modal = $('modal').value.trim();
+      const lot   = $('lot').value.trim();
+      const price = $('price').value.trim();
+      const s1    = $('s1').value.trim() || '2';
+
+      const err = $('error'); err.classList.add('hidden'); err.textContent = '';
+      const problems = [];
+      if(!modal || +modal<=0) problems.push('Modal harus diisi (> 0).');
+      if(!lot   || +lot<=0)   problems.push('Lot per layer harus diisi (> 0).');
+      if(!price || +price<=0) problems.push('Harga awal harus diisi (> 0).');
+
+      if(problems.length){
+        err.innerHTML = problems.map(x=>`• ${x}`).join('<br>');
+        err.classList.remove('hidden');
         return;
       }
-      err.classList.add("hidden");
 
       const q = new URLSearchParams({ modal, lot, price, s1 });
-      window.location.href = `result.html?${q.toString()}`;
+      location.href = `result.html?${q.toString()}`;
+    }
+
+    $('run').addEventListener('click', submit);
+    $('reset').addEventListener('click', ()=>{
+      ['modal','lot','price','s1'].forEach(id=>$(id).value='');
+      localStorage.removeItem('xau_form_draft');
+      $('error').classList.add('hidden');
+    });
+
+    // Enter to submit
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter') submit();
     });
   </script>
 </body>
