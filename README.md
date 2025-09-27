@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 🚀 **XAU Layering Simulator** adalah web interaktif untuk mensimulasikan strategi layering *buy-only* pada **XAUUSD (Gold)**.  
-Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal per bucket**, dan **potensi stop-out** saat harga turun ekstrem.
+Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap**, dan **potensi stop-out** saat harga turun ekstrem.
 
 <img src="./assets/Screenshot.png" width="600"> 
 <sub>Contoh tampilan simulator</sub>
