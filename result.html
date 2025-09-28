@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>XAU Layering - Hasil</title>
+  <meta http-equiv="Cache-Control" content="no-store, max-age=0" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -14,7 +15,6 @@
 <body class="bg-gray-50 text-gray-900 p-6 max-w-6xl mx-auto space-y-6">
 
   <!-- Header -->
-   
   <div class="flex items-center justify-between fade-in">
     <div class="font-semibold text-xl">Hasil Simulasi</div>
     <div class="flex items-center gap-3">
@@ -27,7 +27,8 @@
   <div class="bg-white rounded-2xl shadow p-5 fade-in">
     <h3 class="font-semibold mb-2">Pembagian Modal</h3>
     <p class="text-xs text-gray-500 mb-4">
-      Modal dibagi menjadi <b>3 Tahap</b>. Semakin dalam penurunan, gunakan spacing lebih renggang.
+      Modal dibagi menjadi <b>3 Tahap</b>. Semakin dalam penurunan, gunakan spacing lebih renggang.<br>
+      Tahap 2 dan 3 secara default menggunakan spacing 5 dan 10.
     </p>
 
     <div class="grid md:grid-cols-3 gap-4">
@@ -65,10 +66,10 @@
 
     <div class="mt-4 flex flex-wrap items-center gap-3">
       <button id="btn-apply-spacing" class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-        Update Simulation
+        Update
       </button>
       <button id="btn-reset-spacing" class="px-4 py-2 rounded-lg border hover:bg-gray-50">
-        Reset Spacing (2 / 5 / 10)
+        Reset
       </button>
     </div>
   </div>
@@ -77,7 +78,7 @@
   <div class="bg-white rounded-2xl shadow p-5 fade-in">
     <h3 class="font-semibold mb-2">Summary</h3>
 
-    <!-- Kotak Kapasitas -->
+    <!-- Kotak Kapasitas (dihitung dari tabel status) -->
     <div class="grid md:grid-cols-3 gap-3 mb-4">
       <div class="rounded-xl border p-4 bg-emerald-50">
         <div class="text-gray-500 text-xs mb-1">Tahap 1 (Awal)</div>
@@ -124,30 +125,41 @@
   </div>
 
 <script>
-const q = new URLSearchParams(window.location.search);
+/* ---------- Helpers & Params ---------- */
+const q = new URLSearchParams(location.search);
+const $ = id => document.getElementById(id);
+
+function getNumParam(name, fallback){
+  const v = q.get(name);
+  const n = v === null ? NaN : +(`${v}`.trim().replace(',', '.'));
+  return Number.isFinite(n) ? n : fallback;
+}
+
 const inputs = {
-  modal: +q.get("modal"),
-  lot:   +q.get("lot"),
-  price: +q.get("price"),
+  modal: getNumParam('modal', 0),
+  lot:   getNumParam('lot', 0),
+  price: getNumParam('price', 0),
 };
+const s1Initial = getNumParam('s1', 2); // spacing Tahap 1 dari form
 const CONTRACT_SIZE = 100;
 let chartRef = null;
 
-const $  = id => document.getElementById(id);
 const fmt  = n => Number(n ?? 0).toLocaleString("en-US");
 const fmt2 = n => (isFinite(n) ? Number(n).toFixed(2) : "0.00");
 const pct  = x => `${isFinite(x) ? x.toFixed(2) : "0.00"}%`;
 
-$("btn-reset-spacing").addEventListener("click", ()=>{
+/* ---------- UI Events ---------- */
+document.getElementById("btn-reset-spacing").addEventListener("click", ()=>{
   $("spacing-1").value = 2;
   $("spacing-2").value = 5;
   $("spacing-3").value = 10;
   renderAll();
 });
-$("btn-apply-spacing").addEventListener("click", renderAll);
+document.getElementById("btn-apply-spacing").addEventListener("click", renderAll);
 
+/* ---------- Simulation ---------- */
 function simulate(maxIter = 50000, priceFloor = 0) {
-  const valPerDollar = inputs.lot * 100; // CONTRACT_SIZE = 100
+  const valPerDollar = inputs.lot * CONTRACT_SIZE;
   const s1 = +$("spacing-1").value || 2;
   const s2 = +$("spacing-2").value || 5;
   const s3 = +$("spacing-3").value || 10;
@@ -158,24 +170,22 @@ function simulate(maxIter = 50000, priceFloor = 0) {
     { name:"Tahap 3", trigger: Infinity,           spacing: s3 },
   ];
 
-  let rows = [], offset = 0, floating = 0, stop = null;
-  let i = 0;
+  let rows = [], offset = 0, floating = 0, stop = null, i = 0;
 
-  // loop sampai STOP / harga mentok / guard maxIter
   while (i < maxIter) {
     i++;
-
     const b = bs.find(x => floating < x.trigger) || bs.at(-1);
     offset += b.spacing;
 
     const harga = inputs.price - offset;
-    if (harga <= priceFloor) break; // guard kalau perlu
+    if (harga <= priceFloor) break;
 
-    const flAdd  = (inputs.price - harga) * valPerDollar; // akumulasi segitiga
-    floating    += flAdd;
+    // Tambahan floating untuk layer baru (aproksimasi segitiga kumulatif)
+    const flAdd = (inputs.price - harga) * valPerDollar;
+    floating += flAdd;
 
     const equity = inputs.modal - floating;
-    let status   = "Aman";
+    let status = "Aman";
     if (equity <= 0) status = "STOP";
     else if (b.name === "Tahap 2") status = "Waspada";
     else if (b.name === "Tahap 3") status = "Darurat";
@@ -186,7 +196,9 @@ function simulate(maxIter = 50000, priceFloor = 0) {
   return { rows, stop };
 }
 
+/* ---------- Render ---------- */
 function renderAll(){
+  // Header recap
   $("recap").innerHTML = `
     <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 text-gray-700">
       Modal: <b>${fmt(inputs.modal)} USC</b> • Lot/layer: <b>${inputs.lot}</b> • Harga awal: <b>${fmt2(inputs.price)}</b>
@@ -194,7 +206,7 @@ function renderAll(){
 
   const { rows, stop } = simulate();
 
-  // hitung jumlah status
+  // Hitung jumlah status dari tabel
   const aman    = rows.filter(r=>r.status==="Aman").length;
   const waspada = rows.filter(r=>r.status==="Waspada").length;
   const darurat = rows.filter(r=>r.status==="Darurat").length;
@@ -203,25 +215,43 @@ function renderAll(){
   $("cap-2").textContent = `${waspada} Layer`;
   $("cap-3").textContent = `${darurat} Layer`;
 
-  // detail summary
+  // Detail Summary
   const last     = rows.at(-1);
-  const endPrice = stop ? stop.harga : last.harga;
-  const minEq    = Math.min(...rows.map(r=>r.equity));
-  const maxDD    = ((inputs.modal - minEq) / inputs.modal) * 100;
+  const endPrice = stop ? stop.harga : last?.harga ?? inputs.price;
+  const minEq    = rows.length ? Math.min(...rows.map(r=>r.equity)) : inputs.modal;
+  const maxDD    = inputs.modal ? ((inputs.modal - minEq) / inputs.modal) * 100 : 0;
   const dropAbs  = inputs.price - endPrice;
-  const dropPct  = (dropAbs / inputs.price) * 100;
+  const dropPct  = inputs.price ? (dropAbs / inputs.price) * 100 : 0;
 
   $("summary-detail").innerHTML = `
     <div class="grid md:grid-cols-3 gap-3">
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Total Layer</div><div class="text-lg font-semibold">${stop ? stop.layer : last.layer}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Harga Stop</div><div class="text-lg font-semibold">${fmt2(endPrice)}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Total Lot</div><div class="text-lg font-semibold">${fmt2((stop ? stop.layer : last.layer) * inputs.lot)}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Floating Loss</div><div class="text-lg font-semibold">${fmt(stop ? stop.floating : last.floating)}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Equity</div><div class="text-lg font-semibold">${fmt(stop ? minEq : last.equity)}</div></div>
-      <div class="rounded-xl border p-4"><div class="text-xs text-gray-500">Penurunan dari Harga Entry</div><div class="text-lg font-semibold">- ${pct(dropPct)}</div></div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Total Layer Aktif</div>
+        <div class="text-lg font-semibold">${stop ? stop.layer : last?.layer ?? 0}</div>
+      </div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Harga Stop</div>
+        <div class="text-lg font-semibold">${fmt2(endPrice)}</div>
+      </div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Total Lot</div>
+        <div class="text-lg font-semibold">${fmt2(((stop ? stop.layer : last?.layer ?? 0) * inputs.lot) || 0)}</div>
+      </div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Floating Loss</div>
+        <div class="text-lg font-semibold">${fmt(stop ? stop.floating : last?.floating ?? 0)}</div>
+      </div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Equity</div>
+        <div class="text-lg font-semibold">${fmt(stop ? minEq : last?.equity ?? inputs.modal)}</div>
+      </div>
+      <div class="rounded-xl border p-4">
+        <div class="text-xs text-gray-500">Penurunan dari Harga Entry</div>
+        <div class="text-lg font-semibold">-${pct(dropPct)}</div>
+      </div>
     </div>`;
 
-  // tabel
+  // Tabel
   const tb = $("tbody"); tb.innerHTML = "";
   rows.forEach(r=>{
     let rowClass="";
@@ -240,7 +270,7 @@ function renderAll(){
       </tr>`;
   });
 
-  // chart
+  // Grafik
   const ctx = $("chart").getContext("2d");
   if(chartRef) chartRef.destroy();
   chartRef = new Chart(ctx,{
@@ -250,7 +280,13 @@ function renderAll(){
   });
 }
 
-renderAll();
+/* ---------- Init: seed spacing-1 dari form, baru render ---------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  $("spacing-1").value = Number.isFinite(s1Initial) ? s1Initial : 2;
+  if(!$("spacing-2").value) $("spacing-2").value = 5;
+  if(!$("spacing-3").value) $("spacing-3").value = 10;
+  renderAll();
+});
 </script>
 </body>
 </html>
