@@ -8,7 +8,7 @@
 🚀 **XAU Layering Simulator** adalah web interaktif untuk mensimulasikan strategi layering *buy-only* pada **XAUUSD (Gold)**.  
 Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap**, dan **potensi stop-out** saat harga turun ekstrem.
 
-<img src="./assets/Screenshot.png" width="600"> 
+<img src="./assets/Screenshot 2025-09-28 at 08.46.51.png" width="400"> 
 <sub>Contoh tampilan</sub>
 
 ---
@@ -23,7 +23,7 @@ Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap
 
 ---
 
-## 🛠️ Cara Pakai (User)
+## 🛠️ Cara Pakai
 1. Buka [🌐 Demo di Vercel](https://xau-layering.vercel.app).
 2. Isi parameter:
    - **Modal (USC)** → contoh: `70000`
@@ -31,7 +31,6 @@ Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap
    - **Harga Entry** → contoh: `3700`
    - **Spacing Awal** → contoh: `2`
 3. Klik **Run Simulation** → hasil muncul:
-   - Buckets otomatis
    - Summary
    - Tabel Layer
    - Grafik Equity
