@@ -9,13 +9,13 @@
 Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap**, dan **potensi stop-out** saat harga turun ekstrem.
 
 <img src="./assets/Screenshot.png" width="600"> 
-<sub>Contoh tampilan simulator</sub>
+<sub>Contoh tampilan</sub>
 
 ---
 
 ## ✨ Fitur Utama
-- 📝 **Form input sederhana** → hanya `Modal`, `Lot/layer`, dan `Harga awal`.
-- 📊 **Buckets otomatis** → dibuat dari **⅓** & **⅔ modal**.
+- 📝 **Form input sederhana** 
+- 📊 **Pembagian Modal otomatis**
 - 📈 **Summary interaktif** → menampilkan layer STOP, floating loss, equity minimum, max drawdown, dll.
 - 🔢 **Tabel Layer** → rincian per layer (harga, floating loss, equity).
 - 📉 **Grafik Equity vs Harga** → memvisualisasikan penurunan modal secara real-time.
@@ -28,18 +28,10 @@ Aplikasi ini membantu trader memahami **drawdown**, **pembagian modal tiap tahap
 2. Isi parameter:
    - **Modal (USC)** → contoh: `70000`
    - **Lot per Layer** → contoh: `0.03`
-   - **Harga Awal** → contoh: `3700`
+   - **Harga Entry** → contoh: `3700`
+   - **Spacing Awal** → contoh: `2`
 3. Klik **Run Simulation** → hasil muncul:
    - Buckets otomatis
    - Summary
    - Tabel Layer
    - Grafik Equity
-
----
-
-## 💻 Cara Run Lokal (Developer)
-
-Clone repo:
-```bash
-git clone https://github.com/<username>/xau-layering-simulator.git
-cd xau-layering-simulator
