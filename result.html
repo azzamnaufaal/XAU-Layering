@@ -172,7 +172,8 @@ function simulate(maxIter = 50000, priceFloor = 0) {
 
   let rows = [];
   let openPositions = []; 
-  // Layer 1 dibuka tepat di harga awal (Price Entry)
+  
+  // Posisi pertama dibuka tepat di harga input (misal: 4500)
   openPositions.push(inputs.price); 
 
   let currentPrice = inputs.price;
@@ -180,15 +181,15 @@ function simulate(maxIter = 50000, priceFloor = 0) {
   let stop = null;
 
   for (let i = 1; i <= maxIter; i++) {
-    // 1. Tentukan tahap berdasarkan floating saat ini
+    // 1. Tentukan tahap berdasarkan floating (menggunakan spacing tahap tersebut)
     const b = bs.find(x => totalFloating < x.trigger) || bs.at(-1);
     
-    // 2. Harga bergerak turun sejauh spacing ke layer berikutnya
+    // 2. Harga langsung bergerak turun sejauh spacing (misal: ke 4490)
     currentPrice -= b.spacing;
     if (currentPrice <= priceFloor) break;
 
-    // 3. HITUNG FLOATING: 
-    // Semua posisi yang SUDAH terbuka dihitung loss-nya ke harga saat ini
+    // 3. HITUNG FLOATING SEMUA POSISI YANG SUDAH TERBUKA
+    // (Pada iterasi pertama, ini menghitung loss Layer 1 yang diseret ke 4490)
     totalFloating = 0;
     openPositions.forEach(entryPrice => {
       totalFloating += (entryPrice - currentPrice) * valPerDollar;
@@ -211,13 +212,10 @@ function simulate(maxIter = 50000, priceFloor = 0) {
       break; 
     }
 
-    // 4. Setelah floating dihitung, BARU tambahkan layer baru ke dalam list posisi
-    // Ini mensimulasikan harga menyentuh level baru dan membuka posisi baru
-    openPositions.push(currentPrice);
-
     if (b.name === "Tahap 2") status = "Waspada";
     else if (b.name === "Tahap 3") status = "Darurat";
 
+    // 4. Masukkan ke tabel (Harga yang tampil adalah harga setelah turun/running price)
     rows.push({ 
       layer: i, 
       bucket: b.name, 
@@ -226,6 +224,10 @@ function simulate(maxIter = 50000, priceFloor = 0) {
       equity: equity, 
       status 
     });
+
+    // 5. SETELAH dicatat di baris i, buka posisi baru di harga running saat ini
+    // untuk dihitung kerugiannya pada iterasi berikutnya (i+1)
+    openPositions.push(currentPrice);
   }
 
   return { rows, stop };
