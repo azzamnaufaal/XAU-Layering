@@ -157,7 +157,7 @@ document.getElementById("btn-reset-spacing").addEventListener("click", ()=>{
 });
 document.getElementById("btn-apply-spacing").addEventListener("click", renderAll);
 
-/* ---------- Simulation ---------- */
+/* ---------- Simulation (Updated Logic) ---------- */
 function simulate(maxIter = 50000, priceFloor = 0) {
   const valPerDollar = inputs.lot * CONTRACT_SIZE;
   const s1 = +$("spacing-1").value || 2;
@@ -165,37 +165,52 @@ function simulate(maxIter = 50000, priceFloor = 0) {
   const s3 = +$("spacing-3").value || 10;
 
   const bs = [
-    { name:"Tahap 1", trigger: inputs.modal/3,     spacing: s1 },
+    { name:"Tahap 1", trigger: inputs.modal/3,      spacing: s1 },
     { name:"Tahap 2", trigger: (2*inputs.modal)/3, spacing: s2 },
     { name:"Tahap 3", trigger: Infinity,           spacing: s3 },
   ];
 
-  let rows = [], offset = 0, floating = 0, stop = null, i = 0;
+  let rows = [], 
+      currentPrice = inputs.price, 
+      floating = 0, 
+      stop = null;
 
-  while (i < maxIter) {
-    i++;
+  for (let i = 1; i <= maxIter; i++) {
+    // 1. Tentukan tahap berdasarkan floating saat ini
     const b = bs.find(x => floating < x.trigger) || bs.at(-1);
-    offset += b.spacing;
+    
+    // 2. Tentukan harga untuk layer baru
+    const spacing = b.spacing;
+    currentPrice -= spacing;
 
-    const harga = inputs.price - offset;
-    if (harga <= priceFloor) break;
+    if (currentPrice <= priceFloor) break;
 
-    // Tambahan floating untuk layer baru (aproksimasi segitiga kumulatif)
-    const flAdd = (inputs.price - harga) * valPerDollar;
-    floating += flAdd;
+    // 3. LOGIKA VITAL: 
+    // Setiap kali harga turun sejauh 'spacing', SEMUA layer yang SUDAH terbuka 
+    // (sebanyak i-1 layer) akan mengalami kerugian tambahan.
+    const additionalLoss = (i - 1) * spacing * valPerDollar;
+    floating += additionalLoss;
 
+    // 4. Hitung Equity
     const equity = inputs.modal - floating;
+    
     let status = "Aman";
-    if (equity <= 0) status = "STOP";
-    else if (b.name === "Tahap 2") status = "Waspada";
+    if (equity <= 0) {
+      status = "STOP";
+      // Jika stop, kita catat baris terakhir dan hentikan loop
+      rows.push({ layer: i, bucket: b.name, harga: currentPrice, floating, equity: 0, status });
+      stop = rows[rows.length - 1];
+      break;
+    } 
+    
+    if (b.name === "Tahap 2") status = "Waspada";
     else if (b.name === "Tahap 3") status = "Darurat";
 
-    rows.push({ layer:i, bucket:b.name, harga, floating, equity, status });
-    if (status === "STOP") { stop = rows[rows.length - 1]; break; }
+    rows.push({ layer: i, bucket: b.name, harga: currentPrice, floating, equity, status });
   }
+  
   return { rows, stop };
 }
-
 /* ---------- Render ---------- */
 function renderAll(){
   // Header recap
