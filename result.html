@@ -157,6 +157,7 @@ document.getElementById("btn-reset-spacing").addEventListener("click", ()=>{
 });
 document.getElementById("btn-apply-spacing").addEventListener("click", renderAll);
 
+/* ---------- Simulation ---------- */
 function simulate(maxIter = 50000, priceFloor = 0) {
   const valPerDollar = inputs.lot * CONTRACT_SIZE;
   const s1 = +$("spacing-1").value || 2;
@@ -170,28 +171,27 @@ function simulate(maxIter = 50000, priceFloor = 0) {
   ];
 
   let rows = [];
-  let openPositions = []; // List harga entry tiap layer
+  let openPositions = []; 
+  // Layer 1 dibuka tepat di harga awal (Price Entry)
+  openPositions.push(inputs.price); 
+
   let currentPrice = inputs.price;
   let totalFloating = 0;
   let stop = null;
 
   for (let i = 1; i <= maxIter; i++) {
-    // 1. Tentukan tahap berdasarkan total floating saat ini
+    // 1. Tentukan tahap berdasarkan floating saat ini
     const b = bs.find(x => totalFloating < x.trigger) || bs.at(-1);
     
-    // 2. Tentukan harga entry untuk layer baru ini
+    // 2. Harga bergerak turun sejauh spacing ke layer berikutnya
     currentPrice -= b.spacing;
     if (currentPrice <= priceFloor) break;
-    
-    // 3. Simpan harga entry layer ini
-    openPositions.push(currentPrice);
 
-    // 4. HITUNG ULANG TOTAL FLOATING
-    // Kita hitung selisih tiap posisi yang terbuka terhadap harga saat ini (currentPrice)
+    // 3. HITUNG FLOATING: 
+    // Semua posisi yang SUDAH terbuka dihitung loss-nya ke harga saat ini
     totalFloating = 0;
     openPositions.forEach(entryPrice => {
-      let lossPoin = entryPrice - currentPrice; // Selisih poin
-      totalFloating += (lossPoin * valPerDollar); // Jumlahkan ke total
+      totalFloating += (entryPrice - currentPrice) * valPerDollar;
     });
 
     const equity = inputs.modal - totalFloating;
@@ -210,6 +210,10 @@ function simulate(maxIter = 50000, priceFloor = 0) {
       stop = rows[rows.length - 1];
       break; 
     }
+
+    // 4. Setelah floating dihitung, BARU tambahkan layer baru ke dalam list posisi
+    // Ini mensimulasikan harga menyentuh level baru dan membuka posisi baru
+    openPositions.push(currentPrice);
 
     if (b.name === "Tahap 2") status = "Waspada";
     else if (b.name === "Tahap 3") status = "Darurat";
